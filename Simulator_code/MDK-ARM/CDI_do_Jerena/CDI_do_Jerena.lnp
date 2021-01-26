@@ -1,0 +1,23 @@
+--cpu Cortex-M3
+"cdi_do_jerena\startup_stm32f103xb.o"
+"cdi_do_jerena\main.o"
+"cdi_do_jerena\stm32f1xx_it.o"
+"cdi_do_jerena\stm32f1xx_hal_msp.o"
+"cdi_do_jerena\stm32f1xx_hal_gpio_ex.o"
+"cdi_do_jerena\stm32f1xx_hal_tim.o"
+"cdi_do_jerena\stm32f1xx_hal_tim_ex.o"
+"cdi_do_jerena\stm32f1xx_hal.o"
+"cdi_do_jerena\stm32f1xx_hal_rcc.o"
+"cdi_do_jerena\stm32f1xx_hal_rcc_ex.o"
+"cdi_do_jerena\stm32f1xx_hal_gpio.o"
+"cdi_do_jerena\stm32f1xx_hal_dma.o"
+"cdi_do_jerena\stm32f1xx_hal_cortex.o"
+"cdi_do_jerena\stm32f1xx_hal_pwr.o"
+"cdi_do_jerena\stm32f1xx_hal_flash.o"
+"cdi_do_jerena\stm32f1xx_hal_flash_ex.o"
+"cdi_do_jerena\stm32f1xx_hal_exti.o"
+"cdi_do_jerena\system_stm32f1xx.o"
+--library_type=microlib --strict --scatter "CDI_do_Jerena\CDI_do_Jerena.sct"
+--summary_stderr --info summarysizes --map --load_addr_map_info --xref --callgraph --symbols
+--info sizes --info totals --info unused --info veneers
+--list "CDI_do_Jerena.map" -o CDI_do_Jerena\CDI_do_Jerena.axf

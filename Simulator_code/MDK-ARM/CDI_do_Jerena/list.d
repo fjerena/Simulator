@@ -1,0 +1,12 @@
+cdi_do_jerena\list.o: ../Middlewares/Third_Party/FreeRTOS/Source/list.c
+cdi_do_jerena\list.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdlib.h
+cdi_do_jerena\list.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/FreeRTOS.h
+cdi_do_jerena\list.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stddef.h
+cdi_do_jerena\list.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdint.h
+cdi_do_jerena\list.o: ../Inc/FreeRTOSConfig.h
+cdi_do_jerena\list.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/projdefs.h
+cdi_do_jerena\list.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/portable.h
+cdi_do_jerena\list.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/deprecated_definitions.h
+cdi_do_jerena\list.o: ../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM3/portmacro.h
+cdi_do_jerena\list.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/mpu_wrappers.h
+cdi_do_jerena\list.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/list.h
