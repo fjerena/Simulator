@@ -16,6 +16,7 @@
 "cdi_do_jerena\stm32f1xx_hal_flash.o"
 "cdi_do_jerena\stm32f1xx_hal_flash_ex.o"
 "cdi_do_jerena\stm32f1xx_hal_exti.o"
+"cdi_do_jerena\stm32f1xx_hal_uart.o"
 "cdi_do_jerena\system_stm32f1xx.o"
 --library_type=microlib --strict --scatter "CDI_do_Jerena\CDI_do_Jerena.sct"
 --summary_stderr --info summarysizes --map --load_addr_map_info --xref --callgraph --symbols

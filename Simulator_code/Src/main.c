@@ -45,6 +45,10 @@ TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim4;
 
+UART_HandleTypeDef huart3;
+DMA_HandleTypeDef hdma_usart3_rx;
+DMA_HandleTypeDef hdma_usart3_tx;
+
 /* USER CODE BEGIN PV */
 #define FALSE                          0u
 #define TRUE                           1u
@@ -56,6 +60,8 @@ TIM_HandleTypeDef htim4;
 //Global variable
 enum Output_Level {OFF, ON} level;
 enum Event_status {EMPTY, PROGRAMMED, DONE} status;
+enum Transmission_Status {BUFFER_TX_EMPTY, TRANSMITING, TRANSMISSION_DONE} transmstatus = BUFFER_TX_EMPTY;
+enum Reception_Status {BUFFER_RX_EMPTY, DATA_AVAILABLE_RX_BUFFER} receptstatus = BUFFER_RX_EMPTY;
 
 int8_t sim_rpm_index;                                                           
   
@@ -141,16 +147,23 @@ uint16_t kinum=20;
 uint16_t kidenum=1000;				
 int32_t Pwm_PI=0;		
 uint16_t Pwm_OUT=0;		
-int32_t error_visual;																			
-														
+int32_t error_visual;						
+
+//Communication Variables
+uint8_t UART3_txBuffer[6]={'A','1','0','0','0',0x0A};
+uint8_t UART3_rxBuffer[5];																			
+uint8_t Curve_Generation=0;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_DMA_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_TIM4_Init(void);
+static void MX_USART3_UART_Init(void);
 /* USER CODE BEGIN PFP */
 
 void Set_Ouput_LED(void)
@@ -244,6 +257,94 @@ void Engine_STOP_test(void)
   old=actual;  
 }
 
+uint8_t ConvertNum4DigToStr(uint16_t num, uint8_t resp[], uint8_t i)
+{	
+	uint8_t Mil, Cent, Dez, Unid;
+	uint16_t Man;
+		
+	if((num>=0)&&(num<=9999))
+	{
+		Mil = (num/1000u)+0x30;
+		Man = num%1000u;
+		Cent = (Man/100u)+0x30;
+		Man = Man%100u;
+		Dez = (Man/10u)+0x30;
+		Unid = (Man%10u)+0x30;
+	
+		resp[i]=Mil;
+		resp[i+1]=Cent;
+		resp[i+2]=Dez;
+		resp[i+3]=Unid;	
+		
+		return(TRUE);
+	}	
+	else
+	{	
+		return(FALSE);
+	}	
+}	
+
+void Checksum(uint8_t strg[], uint8_t strg_length)
+{	
+	uint8_t i,result;
+		
+	for(i=0;i<(strg_length)-1;i++)
+	{
+		result+=strg[i];
+	}	
+	
+	strg[(strg_length)-1]=result;
+}	
+
+void Data_Transmission(void)
+{	
+	UART3_txBuffer[0] = 'R';
+	UART3_txBuffer[5] = 0x0A;
+	ConvertNum4DigToStr(MotorSpeed, UART3_txBuffer, 1);
+	transmstatus = TRANSMITING;
+	HAL_UART_Transmit_DMA(&huart3, UART3_txBuffer, sizeof(UART3_txBuffer));
+}	
+
+uint8_t Data_Reception()
+{	
+	uint8_t i, j, service;
+	uint8_t buffer[5];
+	
+	if(receptstatus == DATA_AVAILABLE_RX_BUFFER)
+	{	
+	
+		for(i=0;i<5;i++)
+		{
+			buffer[i] = UART3_rxBuffer[i];
+			UART3_rxBuffer[i] = 0x00;
+		}	
+	
+		service=buffer[0];
+		j=1;
+	
+		switch(service)
+		{	
+			case 'A': MotorSpeed_Setpoint=(((buffer[j]-48u)*1000u)+((buffer[j+1]-48u)*100u)+((buffer[j+2]-48u)*10u)+((buffer[j+3]-48u*1u)));
+								break;
+		
+			case 'B': MotorSpeed_Setpoint=0;
+								break;
+		
+			case 'C': Curve_Generation=1;
+								break;
+		
+			case 'D': Curve_Generation=0;
+								time_elapsed=0;
+								MotorSpeed_Setpoint=0;		
+								break;
+			
+			default:  break;
+		}	
+		
+		receptstatus = BUFFER_RX_EMPTY;
+	}
+}
+
 void PI_Control(void)
 {		
 	int32_t Error=0;
@@ -295,24 +396,30 @@ void Task_Medium(void)
 	
 	Set_Ouput_LED();	
 	
-	if(time_elapsed==0)
+	Data_Reception();
+	Data_Transmission();
+	
+	if(Curve_Generation)
 	{	
-		MotorSpeed_Setpoint=motor_status.motor_speed[i];		
-		time_elapsed=motor_status.timer[i];	
-			
-		if(i<Sat_Motor_Speed)
+		if(time_elapsed==0)
 		{	
-			i++;
-		}	
+			MotorSpeed_Setpoint=motor_status.motor_speed[i];		
+			time_elapsed=motor_status.timer[i];	
+			
+			if(i<Sat_Motor_Speed)
+			{	
+				i++;
+			}	
+			else
+			{	
+				i=0;
+			}		
+		}		
 		else
 		{	
-			i=0;
-		}		
-  }		
-	else
-	{	
-		time_elapsed--;
-	}	
+			time_elapsed--;
+		}	
+	}
 	
 	//MotorSpeed_Setpoint=1000;
   PI_Control();  
@@ -355,6 +462,24 @@ void Set_Pulse_Program(void)
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
+{
+  transmstatus = TRANSMISSION_DONE;
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{		
+	receptstatus = DATA_AVAILABLE_RX_BUFFER;
+	HAL_UART_Receive_DMA(&huart3, (uint8_t*)UART3_rxBuffer, sizeof(UART3_rxBuffer));	  	
+}
+
+void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
+{
+	static int8_t k;
+	
+	k++;
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -385,10 +510,13 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_TIM2_Init();
   MX_TIM3_Init();
   MX_TIM4_Init();
+  MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
+	HAL_UART_Receive_DMA(&huart3, (uint8_t*)UART3_rxBuffer, sizeof(UART3_rxBuffer));
 	
 	__HAL_TIM_ENABLE_IT(&htim2, TIM_IT_UPDATE);          
 	HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_1);
@@ -612,6 +740,58 @@ static void MX_TIM4_Init(void)
 }
 
 /**
+  * @brief USART3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART3_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART3_Init 0 */
+
+  /* USER CODE END USART3_Init 0 */
+
+  /* USER CODE BEGIN USART3_Init 1 */
+
+  /* USER CODE END USART3_Init 1 */
+  huart3.Instance = USART3;
+  huart3.Init.BaudRate = 9600;
+  huart3.Init.WordLength = UART_WORDLENGTH_8B;
+  huart3.Init.StopBits = UART_STOPBITS_1;
+  huart3.Init.Parity = UART_PARITY_NONE;
+  huart3.Init.Mode = UART_MODE_TX_RX;
+  huart3.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart3.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART3_Init 2 */
+
+  /* USER CODE END USART3_Init 2 */
+
+}
+
+/** 
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void) 
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMA1_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA1_Channel2_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Channel2_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Channel2_IRQn);
+  /* DMA1_Channel3_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Channel3_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Channel3_IRQn);
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -636,10 +816,10 @@ static void MX_GPIO_Init(void)
                           |GPIO_PIN_12, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_10 
-                          |GPIO_PIN_11|GPIO_PIN_12|GPIO_PIN_13|GPIO_PIN_14 
-                          |GPIO_PIN_15|GPIO_PIN_3|GPIO_PIN_4|GPIO_PIN_5 
-                          |GPIO_PIN_7|GPIO_PIN_8|GPIO_PIN_9, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_12 
+                          |GPIO_PIN_13|GPIO_PIN_14|GPIO_PIN_15|GPIO_PIN_3 
+                          |GPIO_PIN_4|GPIO_PIN_5|GPIO_PIN_7|GPIO_PIN_8 
+                          |GPIO_PIN_9, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : PC13 */
   GPIO_InitStruct.Pin = GPIO_PIN_13;
@@ -679,14 +859,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : PB2 PB10 PB11 PB12 
-                           PB13 PB14 PB15 PB3 
-                           PB4 PB5 PB7 PB8 
-                           PB9 */
-  GPIO_InitStruct.Pin = GPIO_PIN_2|GPIO_PIN_10|GPIO_PIN_11|GPIO_PIN_12 
-                          |GPIO_PIN_13|GPIO_PIN_14|GPIO_PIN_15|GPIO_PIN_3 
-                          |GPIO_PIN_4|GPIO_PIN_5|GPIO_PIN_7|GPIO_PIN_8 
-                          |GPIO_PIN_9;
+  /*Configure GPIO pins : PB2 PB12 PB13 PB14 
+                           PB15 PB3 PB4 PB5 
+                           PB7 PB8 PB9 */
+  GPIO_InitStruct.Pin = GPIO_PIN_2|GPIO_PIN_12|GPIO_PIN_13|GPIO_PIN_14 
+                          |GPIO_PIN_15|GPIO_PIN_3|GPIO_PIN_4|GPIO_PIN_5 
+                          |GPIO_PIN_7|GPIO_PIN_8|GPIO_PIN_9;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
