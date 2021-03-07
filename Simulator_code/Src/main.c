@@ -129,10 +129,16 @@ typedef struct Motor_Control
 	uint16_t timer[10];
 }motor_control_type;
 
-motor_control_type motor_status = {{    0,  1200,   800,  1000,  1500,
-	                                   1500,  1000,   800,   500,   350},
-                                    { 450,   100,   200,   200,   200,
-									                    150,   100,   100,   100,   100}};  									
+/*
+motor_control_type motor_status = {{    0,  1000,  2000,  1000,  2000,
+	                                   1000,  2000,  1000,  2000,  1000},
+                                    {  30,   400,   400,   400,   400,
+									                    400,   400,   400,   400,   400}};  
+*/
+motor_control_type motor_status = {{    0,  1000,  1500,  2000,  2500,
+	                                   3000,  3500,  4000,  4500,  5000},
+                                    { 200,   400,   400,   400,   400,
+									                    400,   400,   400,   400,   400}};  
                         	
 
 uint8_t time_elapsed;
@@ -372,6 +378,7 @@ void PI_Control(void)
   }  
 	else
 	{	
+		/*
 		if(Pwm_PI<0u)
 		{	
 			Pwm_OUT=0u;
@@ -380,6 +387,8 @@ void PI_Control(void)
 	  {	
 			Pwm_OUT=2800u;
 		}	
+		*/
+		Pwm_OUT=0u;
   }	  	
 	
 	__HAL_TIM_SET_COMPARE(&htim4,TIM_CHANNEL_1,Pwm_OUT);
@@ -399,7 +408,8 @@ void Task_Medium(void)
 	Data_Reception();
 	Data_Transmission();
 	
-	if(Curve_Generation)
+	//if(Curve_Generation)
+	if(1)
 	{	
 		if(time_elapsed==0)
 		{	
@@ -541,7 +551,7 @@ int main(void)
     //Scheduler
 		Periodic_task(20,&Task_Fast, array_sched_var, 0);		
 		Periodic_task(100,&Task_Medium, array_sched_var, 1);		
-		Periodic_task(5000,&Task_Slow, array_sched_var, 2);		
+		Periodic_task(1000,&Task_Slow, array_sched_var, 2);		
     		
     /* USER CODE END WHILE */
 
